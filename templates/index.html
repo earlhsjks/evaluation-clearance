@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Survey Clearance System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet" />
+
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f8f9fa;
+    }
+    .survey-box {
+      width: 100%;
+      max-width: 500px;
+      padding: 2rem;
+      border-radius: 1rem;
+      background: #fff;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    .survey-title {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    .subtitle {
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+    }
+    .status-box {
+    width: 435px;
+    height: 150px;
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 2px dashed #ccc;
+    background: #f1f1f1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    }
+    .result-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+    .result-status {
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: 500;
+      font-size: 1.5rem;
+      color: #007bff;
+      display: block;
+    }
+    .btn-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .btn-refresh {
+      width: 40px;
+      height: 40px;
+      background-color: #007bff;
+      color: white;
+      border-radius: 5px;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.5rem;
+      transition: background-color 0.3s;
+    }
+    .btn-refresh:hover {
+      background-color: #0056b3;
+    }
+    #searchInput {
+     border: 1px solid #007bff; /* You can change the color here */
+     padding: 8px; /* Optional, adjusts the input box size */
+    }       
+  </style>
+</head>
+<body>
+
+<div class="survey-box">
+  <div class="survey-title">Survey Clearance System</div>
+  <div class="subtitle">Computer Science Center</div>
+
+  <div class="mb-3">
+    <input type="text" id="searchInput" class="form-control" placeholder="Enter School ID or Name" />
+  </div>
+
+  <div class="btn-container">
+    <button id="searchBtn" class="btn btn-primary w-100">Search</button>
+    <button id="refreshBtn" class="btn-refresh">
+      <i class="fas fa-sync-alt"></i>
+    </button>
+  </div>
+
+  <div class="status-box">
+    <div id="searchingBox" style="display: none;">
+      <div id="searchingText" class="result-status">Searching...</div>
+    </div>
+    <div id="resultBox"></div>
+  </div>
+</div>
+
+<script>
+    const searchInput = document.getElementById('searchInput');
+    const resultBox = document.getElementById('resultBox');
+    const searchingBox = document.getElementById('searchingBox');
+    const searchBtn = document.getElementById('searchBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+
+    let lastActivityTime = Date.now();
+    let autoRefreshInterval;
+    let stopAfter24HoursTimeout;
+    let debounceTimeout;
+    let currentSearchId = 0;
+
+    // --- Search function ---
+    function performSearch(query) {
+    // If the input is empty, hide searching and clear results
+    if (!query.trim()) {
+        resultBox.innerHTML = '';
+        searchingBox.style.display = 'none';
+        return;
+    }
+
+    const searchId = ++currentSearchId;  // Increment to track this request
+    searchingBox.style.display = 'block';
+    resultBox.innerHTML = '';  // Clear previous results
+
+    let searchBy = /^\d+$/.test(query) ? 'id' : 'name';
+
+    fetch('/api/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ search_by: searchBy, query: query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (searchId !== currentSearchId) {
+        return; // Ignore results if a new search started after this one
+        }
+
+        searchingBox.style.display = 'none'; // Hide searching once done
+
+        if (data.status === 'Cleared') {
+        resultBox.innerHTML = `
+            <div class="result-name">${data.data.name}</div>
+            <div class="result-status">${data.message}</div>
+        `;
+        } else {
+        resultBox.innerHTML = `
+            <div class="result-name">Not Found</div>
+            <div class="result-status">No matching record.</div>
+        `;
+        }
+    })
+    .catch(error => {
+        if (searchId !== currentSearchId) return;
+        searchingBox.style.display = 'none';
+        resultBox.innerHTML = `
+        <div class="result-name">Error</div>
+        <div class="result-status">${error}</div>
+        `;
+    });
+    }
+
+    // --- Manual search on button click ---
+    searchBtn.addEventListener('click', function () {
+    const query = searchInput.value;
+    performSearch(query);
+    recordActivity();
+    });
+
+    // --- Live search on input ---
+    searchInput.addEventListener('input', function () {
+    const query = this.value;
+
+    // Clear previous results
+    resultBox.innerHTML = '';
+
+    // Show "Searching" for 1 second after typing starts
+    if (query.trim()) {
+        searchingBox.style.display = 'block';  // Show searching status
+    } else {
+        searchingBox.style.display = 'none';  // Hide searching status when input is empty
+    }
+
+    // Debounce: reset the timer every time you type, but only search after 1 second of no typing
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+        if (query.trim()) {
+        performSearch(query); // Perform the search after the delay
+        }
+    }, 500);  // 1000ms delay for typing to stop (1 second)
+
+    recordActivity();
+    });
+
+    // --- Refresh button ---
+    refreshBtn.addEventListener('click', function () {
+    fetch('/api/refresh', { method: 'POST' })
+        .then(response => response.json())
+        .then(() => {
+        const query = searchInput.value;
+        if (query.trim()) {
+            performSearch(query);
+        }
+        })
+        .catch(error => {
+        resultBox.innerHTML = `
+            <div class="result-name">Error</div>
+            <div class="result-status">${error}</div>
+        `;
+        });
+    recordActivity();
+    });
+
+    // --- Record any user activity ---
+    function recordActivity() {
+    lastActivityTime = Date.now();
+    resetInactivityTimeout();
+    }
+
+    // --- Set up auto refresh every 30 minutes ---
+    function startAutoRefresh() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(() => {
+        const now = Date.now();
+        if (now - lastActivityTime <= 24 * 60 * 60 * 1000) {
+        fetch('/api/refresh', { method: 'POST' })
+            .then(response => response.json())
+            .catch(error => console.error('Auto refresh error:', error));
+        }
+    }, 30 * 60 * 1000);  // 30 minutes
+    }
+
+    // --- Stop auto refresh after 24h inactivity ---
+    function resetInactivityTimeout() {
+    if (stopAfter24HoursTimeout) clearTimeout(stopAfter24HoursTimeout);
+    stopAfter24HoursTimeout = setTimeout(() => {
+        clearInterval(autoRefreshInterval);
+        console.log('Auto refresh stopped after 24 hours of inactivity.');
+    }, 24 * 60 * 60 * 1000);  // 24 hours
+    }
+
+    // --- Track general activity ---
+    ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach(event => {
+    window.addEventListener(event, recordActivity);
+    });
+
+    // --- Start everything ---
+    startAutoRefresh();
+    resetInactivityTimeout();
+</script>
+    
+</body>
+</html>

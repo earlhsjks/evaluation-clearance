@@ -1,0 +1,10 @@
+waitress
+flask
+requests
+pandas
+lxml
+flask_sqlalchemy
+config
+pymysql
+flask-socketio
+apscheduler
