@@ -7,6 +7,7 @@ from config import Config
 from flask_sqlalchemy import SQLAlchemy
 from models.models import db, Student, Settings
 from flask_socketio import SocketIO, emit  # Import SocketIO
+from waitress import serve
 
 app = Flask(__name__)
 
@@ -186,4 +187,5 @@ def update_spreadsheet_link(new_link):
     db.session.commit()
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)  # Use socketio.run() instead of app.run() to enable Socket.IO
+    serve(app, host='0.0.0.0', port=5005)
+    socketio.run(app, debug=True)
