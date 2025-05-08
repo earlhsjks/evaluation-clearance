@@ -150,10 +150,15 @@ def refresh_data():
 
         # Clean the data
         df.columns = [str(col).strip() for col in df.columns]
-        df['School ID Number'] = df['School ID Number'].astype(str).apply(lambda x: re.sub(r'\s+', '', x)).str.replace('.0', '').str.strip()
+        df['School ID Number'] = df['School ID Number'].astype(str).apply(
+            lambda x: re.sub(r'\s+', '', x)
+        ).str.replace('.0', '', regex=False).str.strip()
 
-        # Clear the existing student data and insert new data
-        Student.query.delete()  # Delete all previous data
+        # Clear the existing student data and reset auto-increment
+        db.session.execute('TRUNCATE TABLE student')  # Reset the table fully
+        db.session.commit()
+
+        # Insert new data
         for index, row in df.iterrows():
             school_id = row['School ID Number']
             name = row['Name (Ex. Juan S. Dela Cruz)']
