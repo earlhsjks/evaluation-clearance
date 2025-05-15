@@ -9,17 +9,6 @@ class Student(db.Model):
     school_id = db.Column(db.String(255), nullable=False, unique=True)
     name = db.Column(db.String(255), nullable=False)
 
-    # Relationship with SurveyResponse
-    survey_responses = db.relationship('SurveyResponse', backref='student', lazy=True)
-
-# Model for 'survey_responses' table
-class SurveyResponse(db.Model):
-    __tablename__ = 'survey_responses'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
-    question_id = db.Column(db.String(255), nullable=False)
-    answer = db.Column(db.String(255), nullable=False)
-
 # Model for 'settings' table
 class Settings(db.Model):
     __tablename__ = 'settings'
