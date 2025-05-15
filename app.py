@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
-import requests
+import requests, time
 from io import StringIO
 import re
 from config import Config
@@ -28,9 +28,20 @@ def get_spreadsheet_link():
         return setting.value
     return None  # Return None if the spreadsheet link is not found
 
-# Function to import and refresh student data from Google Sheets
+_last_refresh_time = 0  # Global variable to store last refresh timestamp
+
 def refresh_student_data():
+    global _last_refresh_time
+    cooldown_period = 10  # seconds
+    
+    current_time = time.time()
+    if current_time - _last_refresh_time < cooldown_period:
+        print(f"Cooldown active. Please wait {cooldown_period - (current_time - _last_refresh_time):.1f} seconds before refreshing again.")
+        return
+    
     try:
+        _last_refresh_time = current_time  # Update the last run time immediately to prevent race conditions
+
         # Fetch the Google Sheet using the link from the Settings table
         sheet_url = get_spreadsheet_link()
         if not sheet_url:
@@ -69,6 +80,7 @@ def refresh_student_data():
 
     except Exception as e:
         print(f"Error occurred while refreshing student data: {str(e)}")
+
 
 # Set up APScheduler to run the refresh function every hour
 # (This can also be triggered manually in other cases)
