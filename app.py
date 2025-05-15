@@ -4,6 +4,7 @@ import requests
 from io import StringIO
 import re
 from config import Config
+from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
 from models.models import db, Student, Settings
 from flask_socketio import SocketIO, emit  # Import SocketIO
@@ -48,7 +49,8 @@ def refresh_student_data():
         df['School ID Number'] = df['School ID Number'].astype(str).apply(lambda x: re.sub(r'\s+', '', x)).str.replace('.0', '').str.strip()
 
         # Clear the current student records in the database
-        Student.query.delete()
+        db.session.execute(text('TRUNCATE TABLE student'))
+        db.session.commit()
 
         # Insert new data into the database
         for _, row in df.iterrows():
@@ -153,7 +155,8 @@ def refresh_data():
         df['School ID Number'] = df['School ID Number'].astype(str).apply(lambda x: re.sub(r'\s+', '', x)).str.replace('.0', '').str.strip()
 
         # Clear the existing student data and insert new data
-        Student.query.delete()  # Delete all previous data
+        db.session.execute(text('TRUNCATE TABLE student'))
+        db.session.commit()
         for index, row in df.iterrows():
             school_id = row['School ID Number']
             name = row['Name (Ex. Juan S. Dela Cruz)']
