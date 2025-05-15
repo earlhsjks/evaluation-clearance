@@ -49,7 +49,9 @@ def refresh_student_data():
         df['School ID Number'] = df['School ID Number'].astype(str).apply(lambda x: re.sub(r'\s+', '', x)).str.replace('.0', '').str.strip()
 
         # Clear the current student records in the database
-        db.session.execute(text('TRUNCATE TABLE student'))
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 0'))
+        db.session.execute(text('TRUNCATE TABLE students'))
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 1'))
         db.session.commit()
 
         # Insert new data into the database
@@ -155,8 +157,11 @@ def refresh_data():
         df['School ID Number'] = df['School ID Number'].astype(str).apply(lambda x: re.sub(r'\s+', '', x)).str.replace('.0', '').str.strip()
 
         # Clear the existing student data and insert new data
-        db.session.execute(text('TRUNCATE TABLE student'))
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 0'))
+        db.session.execute(text('TRUNCATE TABLE students'))
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 1'))
         db.session.commit()
+
         for index, row in df.iterrows():
             school_id = row['School ID Number']
             name = row['Name (Ex. Juan S. Dela Cruz)']
