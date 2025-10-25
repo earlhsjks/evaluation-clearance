@@ -1,0 +1,125 @@
+/* ======================================================
+   SURVEY CLEARANCE SYSTEM UI - CLEAN DASHBOARD STYLE
+   ====================================================== */
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: #f9fafb;
+  color: #374151;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.survey-container {
+  width: 100%;
+  height: 100vh;
+  padding: 20px;
+}
+
+.survey-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+  padding: 40px 32px;
+  max-width: 500px;
+  width: 100%;
+}
+
+.survey-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.survey-subtitle {
+  color: #6b7280;
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+.form-control {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 1rem;
+}
+
+.form-control:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.btn {
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.btn-primary:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-refresh {
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.status-card {
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 24px 16px;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: background-color 0.3s;
+}
+
+.status-card:hover {
+  background-color: #f3f4f6;
+}
+
+.result-area .result-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.result-area .result-status {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: #2563eb;
+  margin-top: 0.25rem;
+}
+
+.loading-spinner i {
+  font-size: 2rem;
+  color: #2563eb;
+}
+
+@media (max-width: 576px) {
+  .survey-card {
+    padding: 28px 20px;
+  }
+
+  .survey-title {
+    font-size: 1.5rem;
+  }
+
+  .status-card {
+    padding: 16px;
+    min-height: 120px;
+  }
+}

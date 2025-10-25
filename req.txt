@@ -5,6 +5,7 @@ pandas
 lxml
 flask_sqlalchemy
 config
-pymysql
 flask-socketio
 apscheduler
+dotenv
+mysql-connector-python

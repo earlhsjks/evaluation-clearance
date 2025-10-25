@@ -5,207 +5,154 @@ from io import StringIO
 import re
 from config import Config
 from sqlalchemy import text
-from flask_sqlalchemy import SQLAlchemy
 from models.models import db, Student, Settings
-from flask_socketio import SocketIO, emit  # Import SocketIO
+from flask_socketio import SocketIO
 from waitress import serve
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
-
-# Load configuration from config.py
 app.config.from_object(Config)
 
-# Initialize the SQLAlchemy instance after app configuration
 db.init_app(app)
-
-# Initialize Flask-SocketIO
 socketio = SocketIO(app)
 
-# Function to get the spreadsheet link from the settings table
+_last_refresh_time = 0
+
 def get_spreadsheet_link():
-    setting = db.session.query(Settings).filter_by(key='spreadsheet_link').first()
-    if setting:
-        return setting.value
-    return None  # Return None if the spreadsheet link is not found
+    setting = Settings.query.filter_by(key='spreadsheet_link').first()
+    return setting.value if setting else None
 
-_last_refresh_time = 0  # Global variable to store last refresh timestamp
+def import_sheet_to_db():
+    sheet_url = get_spreadsheet_link()
+    if not sheet_url:
+        return False, "Spreadsheet URL missing"
 
-def refresh_student_data():
-    global _last_refresh_time
-    cooldown_period = 10  # seconds
-    
-    current_time = time.time()
-    if current_time - _last_refresh_time < cooldown_period:
-        print(f"Cooldown active. Please wait {cooldown_period - (current_time - _last_refresh_time):.1f} seconds before refreshing again.")
-        return
-    
     try:
-        _last_refresh_time = current_time  # Update the last run time immediately to prevent race conditions
-
-        # Fetch the Google Sheet using the link from the Settings table
-        sheet_url = get_spreadsheet_link()
-        if not sheet_url:
-            print("Spreadsheet URL is not configured.")
-            return
-
         response = requests.get(sheet_url)
         response.raise_for_status()
 
-        # Read the spreadsheet content into a DataFrame
-        html_content = StringIO(response.text)
-        df = pd.read_html(html_content, header=0)[0]
-
-        # Clean up columns and IDs
+        df = pd.read_csv(StringIO(response.text))
         df.columns = [str(col).strip() for col in df.columns]
-        df['School ID Number'] = df['School ID Number'].astype(str).apply(lambda x: re.sub(r'\s+', '', x)).str.replace('.0', '').str.strip()
+        df['School ID Number'] = (
+            df['School ID Number']
+            .astype(str)
+            .apply(lambda x: re.sub(r'\s+', '', x))
+            .str.replace('.0', '')
+            .str.strip()
+        )
 
-        # Clear the current student records in the database
-        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 0'))
-        db.session.execute(text('TRUNCATE TABLE students'))
-        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 1'))
-        db.session.commit()
+        db.session.query(Student).delete()
+        db.session.commit
 
-        # Insert new data into the database
+        # UPSERT logic instead of TRUNCATE
         for _, row in df.iterrows():
-            school_id = row['School ID Number']
-            name = row['Name (Ex. Juan S. Dela Cruz)']
-            student = Student(school_id=school_id, name=name)
-            db.session.add(student)
-
+            student = Student.query.filter_by(school_id=row['School ID Number']).first()
+            if student:
+                student.name = row['Name (Ex. Juan S. Dela Cruz)']
+            else:
+                db.session.add(Student(
+                    school_id=row['School ID Number'],
+                    name=row['Name (Ex. Juan S. Dela Cruz)']
+                ))
         db.session.commit()
-        print(f"Student data refreshed from {sheet_url}")
-        
-        # Emit a message to notify clients of the data update
-        socketio.emit('student_data_updated', {'message': 'Student data has been updated!'}, broadcast=True)
+
+        return True, "Student data updated"
 
     except Exception as e:
-        print(f"Error occurred while refreshing student data: {str(e)}")
+        return False, str(e)
+
+def refresh_student_data():
+    global _last_refresh_time
+    cooldown = 10
+    now = time.time()
+    if now - _last_refresh_time < cooldown:
+        return False, "Cooldown active"
+
+    _last_refresh_time = now
+    ok, msg = import_sheet_to_db()
+    if ok:
+        socketio.emit('student_data_updated', {'message': 'Student data updated'})
+    return ok, msg
 
 
-# Set up APScheduler to run the refresh function every hour
-# (This can also be triggered manually in other cases)
-from apscheduler.schedulers.background import BackgroundScheduler
+# Scheduler will start but first run delayed
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=refresh_student_data, trigger="interval", hours=1)  # Set the interval to 1 hour
+scheduler.add_job(refresh_student_data, trigger="interval", hours=1, next_run_time=None)
 scheduler.start()
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/api/check', methods=['POST'])
 def api_check():
     data = request.get_json()
     search_by = data.get('search_by')
     query = data.get('query', '').strip()
-
     if not query:
         return jsonify({'status': 'Empty', 'message': ''})
 
     try:
-        # Search for student by ID or Name
-        found_student = None
-        if search_by == 'id':
-            found_student = Student.query.filter_by(school_id=query).first()
-        else:  # search by name
-            found_student = Student.query.filter(Student.name.ilike(f'%{query}%')).first()
-
-        if found_student:
+        student = (Student.query.filter_by(school_id=query).first()
+                   if search_by == 'id'
+                   else Student.query.filter(Student.name.ilike(f'%{query}%')).first())
+        if student:
             return jsonify({
                 'status': 'Cleared',
-                'message': f"Cleared!",
-                'data': {'id': found_student.school_id, 'name': found_student.name}
+                'message': 'Cleared!',
+                'data': {'id': student.school_id, 'name': student.name}
             })
-        else:
-            return jsonify({'status': 'Not Found', 'message': 'No Evaluation yet. ❌'})
-
+        return jsonify({'status': 'Not Found', 'message': 'No Evaluation yet ❌'})
     except Exception as e:
-        return jsonify({'status': 'Error', 'message': f'Error occurred: {str(e)}'})
+        return jsonify({'status': 'Error', 'message': str(e)})
+
 
 @app.route('/api/save_response', methods=['POST'])
 def save_response():
     data = request.get_json()
     student_id = data.get('student_id')
     responses = data.get('responses')
-
     if not student_id or not responses:
-        return jsonify({'status': 'Error', 'message': 'Missing student ID or responses'})
-
+        return jsonify({'status': 'Error', 'message': 'Missing fields'})
     try:
-        # Save survey responses to the database
         student = Student.query.filter_by(school_id=student_id).first()
         if not student:
             return jsonify({'status': 'Error', 'message': 'Student not found'})
-
         db.session.commit()
-
-        # Emit a message to notify clients that a survey response has been saved
-        socketio.emit('survey_response_saved', {'message': f'Survey response for student {student_id} has been saved!'}, broadcast=True)
-
-        return jsonify({'status': 'Success', 'message': 'Responses saved successfully'})
-
+        socketio.emit('survey_response_saved',
+                    {'message': f'Survey saved for {student_id}'}, broadcast=True)
+        return jsonify({'status': 'Success', 'message': 'Responses saved'})
     except Exception as e:
-        return jsonify({'status': 'Error', 'message': f'Error occurred: {str(e)}'})
-    
-# Route to refresh the database
+        return jsonify({'status': 'Error', 'message': str(e)})
+
+
 @app.route('/api/refresh', methods=['POST'])
 def refresh_data():
-    try:
-        # Fetch the spreadsheet URL
-        sheet_url = get_spreadsheet_link()
-        if not sheet_url:
-            return jsonify({'status': 'Error', 'message': 'Spreadsheet URL not configured'})
+    ok, msg = refresh_student_data()
+    return jsonify({'status': 'Success' if ok else 'Error', 'message': msg})
 
-        # Fetch and parse the updated data from the spreadsheet
-        response = requests.get(sheet_url)
-        response.raise_for_status()
 
-        # Parse the HTML content into a DataFrame
-        html_content = StringIO(response.text)
-        df = pd.read_html(html_content, header=0)[0]
-
-        # Clean the data
-        df.columns = [str(col).strip() for col in df.columns]
-        df['School ID Number'] = df['School ID Number'].astype(str).apply(lambda x: re.sub(r'\s+', '', x)).str.replace('.0', '').str.strip()
-
-        # Clear the existing student data and insert new data
-        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 0'))
-        db.session.execute(text('TRUNCATE TABLE students'))
-        db.session.execute(text('SET FOREIGN_KEY_CHECKS = 1'))
-        db.session.commit()
-
-        for index, row in df.iterrows():
-            school_id = row['School ID Number']
-            name = row['Name (Ex. Juan S. Dela Cruz)']
-            student = Student(school_id=school_id, name=name)
-            db.session.add(student)
-        db.session.commit()
-
-        return jsonify({'status': 'Success', 'message': 'Database refreshed successfully'})
-
-    except Exception as e:
-        return jsonify({'status': 'Error', 'message': f'Error occurred: {str(e)}'})
-
-# SocketIO event to listen for updates on the client-side
 @socketio.on('connect')
 def handle_connect():
     print("Client connected")
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
     print("Client disconnected")
 
-# Function to update the spreadsheet link
-def update_spreadsheet_link(new_link):
-    setting = db.session.query(Settings).filter_by(key='spreadsheet_link').first()
-    if setting:
-        setting.value = new_link  # Update the existing link
-    else:
-        setting = Settings(key='spreadsheet_link', value=new_link)
-        db.session.add(setting)  # Insert the new link
 
+def update_spreadsheet_link(new_link):
+    # Ensure new_link is CSV export URL
+    setting = Settings.query.filter_by(key='spreadsheet_link').first()
+    if setting:
+        setting.value = new_link
+    else:
+        db.session.add(Settings(key='spreadsheet_link', value=new_link))
     db.session.commit()
 
+
 if __name__ == '__main__':
-    serve(app, host='0.0.0.0', port=5005)
-    socketio.run(app, debug=True)
+   app.run(host='0.0.0.0', port=5005, debug=True)
