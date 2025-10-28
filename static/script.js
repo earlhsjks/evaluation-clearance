@@ -78,10 +78,15 @@ searchInput.addEventListener('input', () => {
 
 // Refresh button
 refreshBtn.addEventListener('click', () => {
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    refreshBtn.disabled = true;
+
     fetch('/api/refresh', { method: 'POST' })
         .then(res => res.json())
         .then(() => {
             if (searchInput.value.trim()) performSearch(searchInput.value);
+            refreshBtn.innerHTML = 'Refresh';
+            refreshBtn.disabled = false;
         })
         .catch(error => {
             alert('Manual refresh error. Check the server dude.');
