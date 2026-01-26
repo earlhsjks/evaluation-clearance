@@ -10,7 +10,6 @@ A web application built with Flask to verify student evaluation clearance status
 *   **Google Sheets Integration:** Automatically imports and synchronizes student lists from a public Google Sheet CSV link.
 *   **Dynamic Refresh:** Includes a manual refresh button and an automatic background refresh job that runs every hour to keep data current.
 *   **Responsive UI:** A clean, mobile-friendly interface built with Bootstrap for easy access on any device.
-*   **Live Updates:** Uses WebSockets (Flask-SocketIO) to notify connected clients when student data is updated.
 *   **Efficient Searching:** The search input is debounced to prevent excessive API calls while the user is typing.
 
 ## Technology Stack
