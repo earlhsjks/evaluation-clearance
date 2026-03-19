@@ -15,6 +15,8 @@ function performSearch(query) {
     if (!query.trim()) {
         resultBox.innerHTML = '';
         searchingBox.style.display = 'none';
+        // Broadcast empty state to guest screen
+        localStorage.setItem('staff_typing_id', '');
         return;
     }
 
@@ -39,11 +41,24 @@ function performSearch(query) {
                 <div class="result-name">${data.data.name}</div>
                 <div class="result-status">${data.message}</div>
             `;
+                // BROADCAST TO GUEST SCREEN: Success
+                localStorage.setItem('guest_display_data', JSON.stringify({
+                    name: data.data.name,
+                    status: data.message,
+                    timestamp: Date.now()
+                }));
+
             } else {
                 resultBox.innerHTML = `
                 <div class="result-name">Not Found</div>
                 <div class="result-status">No matching record.</div>
             `;
+                // BROADCAST TO GUEST SCREEN: Not Found
+                localStorage.setItem('guest_display_data', JSON.stringify({
+                    name: "Not Found",
+                    status: "Please check with staff",
+                    timestamp: Date.now()
+                }));
             }
         })
         .catch(error => {
@@ -65,6 +80,10 @@ searchBtn.addEventListener('click', () => {
 
 searchInput.addEventListener('input', () => {
     const query = searchInput.value;
+    
+    // BROADCAST TO GUEST SCREEN: Live Typing
+    localStorage.setItem('staff_typing_id', query);
+
     resultBox.innerHTML = '';
     searchingBox.style.display = query.trim() ? 'block' : 'none';
 

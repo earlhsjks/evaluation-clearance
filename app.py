@@ -85,6 +85,10 @@ scheduler.start()
 def index():
     return render_template('index.html')
 
+@app.route('/viewer')
+def viewer():
+    return render_template('viewer.html')
+
 
 @app.route('/api/check', methods=['POST'])
 def api_check():
