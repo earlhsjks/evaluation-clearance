@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -27,7 +28,8 @@
             border: 1px solid #e5e7eb;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
             padding: 40px 32px;
-            max-width: 600px; /* Slightly wider for visitor clarity */
+            max-width: 600px;
+            /* Slightly wider for visitor clarity */
             width: 100%;
             text-align: center;
         }
@@ -46,7 +48,8 @@
 
         /* Mock Input Style for the Live ID */
         .visitor-input-display {
-            border: 2px solid #3b82f6; /* Blue border to highlight active typing */
+            border: 2px solid #3b82f6;
+            /* Blue border to highlight active typing */
             border-radius: 8px;
             padding: 15px;
             font-size: 2rem;
@@ -98,6 +101,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <div class="survey-card">
@@ -107,13 +111,13 @@
         </div>
 
         <span class="label-text">Verifying ID:</span>
-        <div id="viewLiveID" class="visitor-input-display">---</div>
+        <div id="viewLiveID" class="visitor-input-display">-</div>
 
         <div class="status-card">
             <div id="idleState">
                 <div class="text-muted"><i class="fas fa-search me-2"></i>Waiting for entry...</div>
             </div>
-            
+
             <div id="resultBox" class="result-area" style="display: none;">
                 <div class="result-name" id="viewName">---</div>
                 <div class="result-status" id="viewStatus">---</div>
@@ -134,7 +138,7 @@
             if (event.key === 'staff_typing_id') {
                 const val = event.newValue;
                 viewLiveID.innerText = val && val.trim() !== "" ? val : "---";
-                
+
                 // If staff clears input, clear the visitor's screen too
                 if (!val || val.trim() === "") {
                     resetDisplay();
@@ -148,14 +152,19 @@
             }
         });
 
+        let resultTimer;
+
         function showResult(data) {
             idleState.style.display = 'none';
             resultBox.style.display = 'block';
             viewName.innerText = data.name;
             viewStatus.innerText = data.status;
 
-            // Auto-clear result after 15 seconds so screen stays fresh
-            setTimeout(resetDisplay, 30000);
+            if (resultTimer) {
+                clearTimeout(resultTimer);
+            }
+
+            resultTimer = setTimeout(resetDisplay, 15000);
         }
 
         function resetDisplay() {
@@ -164,4 +173,5 @@
         }
     </script>
 </body>
+
 </html>
